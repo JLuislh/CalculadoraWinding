@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculo Winding</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="scanline"></div>
+<div class="container">
+
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#00e5a0" stroke-width="1.5">
+          <ellipse cx="13" cy="13" rx="10" ry="5" stroke-dasharray="4 2"/>
+          <ellipse cx="13" cy="13" rx="10" ry="5" transform="rotate(60 13 13)" stroke-dasharray="4 2"/>
+          <ellipse cx="13" cy="13" rx="10" ry="5" transform="rotate(120 13 13)" stroke-dasharray="4 2"/>
+          <circle cx="13" cy="13" r="2" fill="#00e5a0"/>
+        </svg>
+      </div>
+      <div class="header-title">
+        <h1>Calculo Winding</h1>
+        <p>Diseño de embobinado · Alambre esmaltado SE / HE / HAPTZ</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="badge badge-green">SE · HE · HAPTZ</span>
+      <span class="badge badge-blue">AWG 10–44</span>
+    </div>
+  </header>
+
+  <!-- ── REQUERIMIENTOS — L, Imax, DCRmax + serie ── -->
+  <div class="panel" style="margin-bottom:1rem">
+    <div class="panel-header"><span class="panel-title">Requerimientos eléctricos</span></div>
+    <div class="panel-body">
+      <div class="field-row3">
+        <div class="field">
+          <label>Inductancia objetivo (L)</label>
+          <input type="number" id="Ltarget" value="1.0" step="0.01" min="0.001" oninput="calc()">
+          <div class="hint">µH — microhenrios</div>
+        </div>
+        <div class="field">
+          <label>Corriente máx. DC</label>
+          <input type="number" id="Imax" value="9.2" step="0.1" min="0.001" oninput="calc()">
+          <div class="hint">Amperios</div>
+        </div>
+        <div class="field">
+          <label>DCR máximo</label>
+          <input type="number" id="DCRmax" value="0.009" step="0.001" min="0.0001" oninput="calc()">
+          <div class="hint">Ohms</div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <div class="field">
+        <label>Serie / Paquete</label>
+        <div class="series-group" id="seriesGroup">
+          <button class="series-btn active" data-series="">Todas</button>
+          <button class="series-btn" data-series="CHIP-5000">5000</button>
+          <button class="series-btn" data-series="CHIP-6500">6500</button>
+          <button class="series-btn" data-series="CHIP-8000">8000</button>
+          <button class="series-btn" data-series="CHIP-10000">10000</button>
+          <button class="series-btn" data-series="CHIP-11000">11000</button>
+        </div>
+        <div class="hint">Filtra por tamaño de paquete — afecta las combinaciones mostradas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SELECCIÓN AUTOMÁTICA ── -->
+  <div class="results-panel" style="margin-bottom:1rem">
+    <div class="panel-header">
+      <span class="panel-title">Combinaciones viables — bobina + vueltas + alambre</span>
+      <span class="badge badge-blue">auto</span>
+    </div>
+    <div style="padding:14px">
+      <div id="autoSelectBox">Calculando...</div>
+      <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text3)">
+        ★ 1 capa = más preciso · ⚠ 2+ capas = DCR estimado ±20% · I alambre calculada con J = <span id="jLabel">400</span> A/cm²
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DETALLE MANUAL ── -->
+  <div id="manualSection" class="main-grid">
+
+    <!-- IZQUIERDA -->
+    <div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Núcleo / bobina</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label>Cargar parámetros de bobina conocida</label>
+            <select id="bobinaPreset" onchange="loadBobina()"></select>
+            <div class="hint">Completa AL y dimensiones desde núcleos medidos</div>
+          </div>
+          <div id="bobinaODwarn" class="alert alert-warn" style="display:none;margin-top:8px;font-size:11px"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Parámetros del núcleo</span></div>
+        <div class="panel-body">
+          <div class="field-row">
+            <div class="field">
+              <label>AL del núcleo</label>
+              <input type="number" id="ALval" value="10" step="0.01" min="0.001" oninput="calc()">
+              <div class="hint">nH/N² — del núcleo o LCR meter</div>
+            </div>
+            <div class="field">
+              <label>Tipo de vueltas</label>
+              <select id="allowHalfTurns" onchange="calc()">
+                <option value="half" selected>Redondear a 0.5</option>
+                <option value="full">Solo enteros</option>
+                <option value="exact">Valor exacto</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Dimensiones de la bobina</span>
+          <select id="dimUnit" onchange="onDimUnitChange()"
+            style="font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--border2);color:var(--text2);border-radius:3px;padding:3px 6px;cursor:pointer">
+            <option value="mils" selected>mils</option>
+            <option value="inch">pulgadas</option>
+            <option value="mm">mm</option>
+          </select>
+        </div>
+        <div class="panel-body">
+          <div class="field-row">
+            <div class="field">
+              <label>Largo bobina</label>
+              <input type="number" id="bobbinLen" value="87" step="0.5" min="0.001" oninput="calc()">
+              <div class="hint" id="hintLen">mils — largo total</div>
+            </div>
+            <div class="field">
+              <label>Corte / rebaje</label>
+              <input type="number" id="bobbinCorte" value="32.5" step="0.5" min="0" oninput="calc()">
+              <div class="hint" id="hintCorte">mils — zona sin bobinar</div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Diámetro externo (OD)</label>
+              <input type="number" id="bobbinOD" value="157" step="0.5" min="0.001" oninput="calc()">
+              <div class="hint" id="hintOD">mils</div>
+            </div>
+            <div class="field">
+              <label>Diámetro interno (ID)</label>
+              <input type="number" id="bobbinID" value="0" step="0.5" min="0" oninput="calc()">
+              <div class="hint" id="hintID">mils — 0 si es sólido</div>
+            </div>
+          </div>
+          <div class="info-box" id="dimInfo">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Tipo de embobinado</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label>Estilo</label>
+            <select id="windingStyle" onchange="onWindingStyleChange()">
+              <option value="close" selected>Close Layer — continuo sin espacio</option>
+              <option value="single">Single Layer — capa única con separación</option>
+              <option value="multi">Multi Layer — múltiples capas</option>
+              <option value="pi">Pi winding — para alta frecuencia</option>
+            </select>
+          </div>
+          <div class="info-box" id="windingInfo">Close Layer: el alambre se enrolla helicoidalmente sin espacio entre vueltas. Máxima densidad.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DERECHA -->
+    <div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Tipo de esmalte</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label>Seleccionar tipo</label>
+            <select id="wireType" onchange="onWireTypeChange()">
+              <option value="SE">SE — Single Enamel · 1 capa · Clase A 105°C</option>
+              <option value="HE">HE — Heavy Enamel · 2 capas · Clase B 130°C</option>
+              <option value="HAPTZ" selected>HAPTZ — Heavy Amidez Polyester · Clase H 180°C ★</option>
+            </select>
+          </div>
+          <div class="mat-info" id="wireInfo"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Calibre del alambre</span></div>
+        <div class="panel-body">
+          <div class="field">
+            <label>AWG</label>
+            <select id="AWG" onchange="onAWGChange()"></select>
+          </div>
+          <div class="info-box" id="wireDiamInfo">—</div>
+          <div id="awgSuggestionBox"></div>
+          <div class="sep"></div>
+          <div class="field-row">
+            <div class="field">
+              <label>Resistividad Cu (µΩ·cm)</label>
+              <input type="number" id="rho" value="1.724" step="0.001" oninput="calc()">
+              <div class="hint">25°C — estándar cobre</div>
+            </div>
+            <div class="field">
+              <label>Factor llenado Ku</label>
+              <input type="number" id="Ku" value="0.40" step="0.01" min="0.1" max="0.95" oninput="calc()">
+              <div class="hint">0.3–0.5 típico</div>
+            </div>
+          </div>
+          <div class="sep"></div>
+          <div class="field">
+            <label>Densidad de corriente J (A/cm²)</label>
+            <input type="number" id="Jdens" value="3000" step="100" min="50" oninput="calc(); document.getElementById('jLabel').textContent=this.value">
+            <div class="hint">400 convección libre · 2000–4000 chip inductor · 6000 pulsado corto</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Verificación de capas</span></div>
+        <div class="panel-body">
+          <div class="info-box" id="layerInfo">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-grid -->
+
+  <div class="formula-bar" id="formulaBar">Ingresa los parámetros para calcular...</div>
+
+  <div class="results-panel">
+    <div class="panel-header">
+      <span class="panel-title">Detalle — núcleo y alambre seleccionado</span>
+      <div id="overallBadge"></div>
+    </div>
+    <div class="metrics-grid">
+      <div class="metric-cell">
+        <div class="metric-label">Vueltas (N)</div>
+        <div class="metric-value" id="rN">—</div>
+        <div class="metric-unit">vueltas</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">Vueltas exactas</div>
+        <div class="metric-value" id="rNexact" style="font-size:18px">—</div>
+        <div class="metric-unit">sin redondear</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">AL real (L/N²)</div>
+        <div class="metric-value" id="rALback" style="font-size:18px">—</div>
+        <div class="metric-unit">nH/N²</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">DCR estimado</div>
+        <div class="metric-value" id="rDCR" style="font-size:18px">—</div>
+        <div class="metric-unit">Ohms</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">Longitud alambre</div>
+        <div class="metric-value" id="rLwire" style="font-size:18px">—</div>
+        <div class="metric-unit">cm</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">Largo efectivo</div>
+        <div class="metric-value" id="rLef" style="font-size:18px">—</div>
+        <div class="metric-unit">mils</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">MLT por vuelta</div>
+        <div class="metric-value" id="rMLT" style="font-size:18px">—</div>
+        <div class="metric-unit">mm</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">Vueltas / capa</div>
+        <div class="metric-value" id="rNperlayer" style="font-size:18px">—</div>
+        <div class="metric-unit">vueltas</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">Capas necesarias</div>
+        <div class="metric-value" id="rLayers" style="font-size:18px">—</div>
+        <div class="metric-unit">capas</div>
+      </div>
+    </div>
+    <div class="status-row" id="statusRow"></div>
+  </div>
+
+  <div id="alertsBox"></div>
+
+  <footer>
+    <p>Calculo Winding · SE · HE · HAPTZ · AWG 10–44</p>
+    <p>Verificar siempre con LCR meter tras fabricar el prototipo</p>
+  </footer>
+
+</div>
+<script src="js/main.js"></script>
+</body>
+</html>
