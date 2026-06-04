@@ -34,9 +34,14 @@ const BOBINA_DATA = {
     nota: 'Serie 10000 var.2 · OD estimado de multi-layer (medir)'
   },
   'B-11000-M9': {
-    series: 'CHIP-11000', OD_mils: 165, AL_nH: 23.5,
+    series: 'CHIP-11000', OD_mils: 93, AL_nH: 17.73,
+    len_mils: 101, corte_mils: 49, od_ok: true, ext_mat: true,
+    nota: 'Serie 11000-M9 · TIYA/770G · OD calculado de 11110 (1000µH, AWG45, 237.5v)'
+  },
+  'B-11000-C5': {
+    series: 'CHIP-11000', OD_mils: 131, AL_nH: 37.83,
     len_mils: 101, corte_mils: 49, od_ok: false, ext_mat: true,
-    nota: 'Serie 11000-M9 · material TIYA/770G · bobina ya formada · OD estimado (medir)'
+    nota: 'Serie 11000-C5 · TIYA/770G · OD calculado de 11118 (4700µH, AWG47, 352.5v)'
   },
 };
 
@@ -95,7 +100,9 @@ const AWG_DATA = {
   30: { d: 0.2546 }, 31: { d: 0.2268 }, 32: { d: 0.2019 }, 33: { d: 0.1798 },
   34: { d: 0.1601 }, 35: { d: 0.1426 }, 36: { d: 0.1270 }, 37: { d: 0.1131 },
   38: { d: 0.1007 }, 39: { d: 0.0897 }, 40: { d: 0.0799 }, 41: { d: 0.0711 },
-  42: { d: 0.0632 }, 43: { d: 0.0564 }, 44: { d: 0.0508 }
+  42: { d: 0.0632 }, 43: { d: 0.0564 }, 44: { d: 0.0508 },
+  45: { d: 0.0452 }, 46: { d: 0.0403 }, 47: { d: 0.0359 },
+  48: { d: 0.0320 }, 49: { d: 0.0285 }
 };
 
 // Corrientes típicas por AWG a 400 A/cm²
@@ -198,7 +205,7 @@ function updateWireDiamInfo() {
 function suggestAWG(Imax, J) {
   const A_needed_mm2 = (Imax / J) * 100;
   const d_needed     = 2 * Math.sqrt(A_needed_mm2 / Math.PI);
-  for (let awg = 44; awg >= 10; awg--) {
+  for (let awg = 49; awg >= 10; awg--) {
     if (AWG_DATA[awg] && AWG_DATA[awg].d >= d_needed) return awg;
   }
   return 10;
@@ -297,7 +304,7 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
       const wtype = WIRE_TYPES[wt];
       const candidates = [];
 
-      for (let awg = 44; awg >= 24; awg--) {
+      for (let awg = 49; awg >= 24; awg--) {
         const wire = AWG_DATA[awg];
         if (!wire) continue;
 
@@ -307,7 +314,7 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
         if (Nper === 0) continue;
 
         const layers   = Math.ceil(N / Nper);
-        if (layers > 4) continue;
+        if (layers > 15) continue;
 
         const OD_eff   = OD_mm + (layers - 1) * dCoat;
         const MLT_mm   = Math.PI * OD_eff;
@@ -471,7 +478,7 @@ function suggestMaterial(AL_nH, Imax_A) {
 //   lefMM  = N × dCoat_mm
 function suggestNewCore(L_uH, Imax_A, DCRmax_val, rho, J) {
   const L_nH = L_uH * 1000;
-  const awg  = Math.min(suggestAWG(Imax_A, J), 44);
+  const awg  = Math.min(suggestAWG(Imax_A, J), 49);
   const wire = AWG_DATA[awg];
   if (!wire) return [];
 
@@ -565,6 +572,7 @@ function buildAWGSelect() {
     { label: '── Medio    AWG 17–26 ──', range: [17, 26] },
     { label: '── Fino     AWG 27–36 ──', range: [27, 36] },
     { label: '── Muy fino AWG 37–44 ──', range: [37, 44] },
+    { label: '── Ultra fino AWG 45–49 ──', range: [45, 49] },
   ];
   sel.innerHTML = '';
   groups.forEach(g => {
