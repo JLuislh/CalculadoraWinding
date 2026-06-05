@@ -295,6 +295,8 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
 
   Object.entries(BOBINA_DATA).forEach(([bobinaKey, bobina]) => {
     if (seriesFilter && bobina.series !== seriesFilter) return;
+    // Bobinas ext_mat (pre-formadas, ej. 11000) solo aparecen si su serie está seleccionada
+    if (!seriesFilter && bobina.ext_mat) return;
     const Nexact = Math.sqrt(L_nH / bobina.AL_nH);
     const N      = roundTurnsHalf(Nexact);
     const OD_mm  = bobina.OD_mils * 0.0254;
@@ -316,7 +318,12 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
         const layers   = Math.ceil(N / Nper);
         if (layers > 15) continue;
 
-        const OD_eff   = OD_mm + (layers - 1) * dCoat;
+        const OD_eff      = OD_mm + (layers - 1) * dCoat;
+        // El espesor acumulado de capas no puede superar el radio del núcleo
+        // (si lo supera, el embobinado sería más grueso que el núcleo mismo)
+        const windingH    = (layers - 1) * dCoat;
+        if (windingH > OD_mm / 2) continue;
+
         const MLT_mm   = Math.PI * OD_eff;
         const Lwire_cm = N * MLT_mm / 10;
         const DCR      = (rho * 1e-6) * Lwire_cm / A_cm2;
@@ -350,11 +357,14 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
 
 function renderAutoSelect(candidates, Imax_A) {
   const box = document.getElementById('autoSelectBox');
-  if (!candidates.length) {
-    const L_uH    = parseFloat(document.getElementById('Ltarget').value) || 1.0;
-    const DCRmax  = parseFloat(document.getElementById('DCRmax').value)  || 0.009;
-    const rho     = parseFloat(document.getElementById('rho').value)     || 1.724;
-    const J       = parseFloat(document.getElementById('Jdens').value)   || 400;
+  const L_uH   = parseFloat(document.getElementById('Ltarget').value) || 1.0;
+  const DCRmax = parseFloat(document.getElementById('DCRmax').value)  || 0.009;
+  const rho    = parseFloat(document.getElementById('rho').value)     || 1.724;
+  const J      = parseFloat(document.getElementById('Jdens').value)   || 400;
+
+  // Sin candidatos O todos los candidatos fallan corriente → sugerir núcleo nuevo
+  const viables = candidates.filter(c => c.iOk);
+  if (!candidates.length || !viables.length) {
     renderNewCoreSuggestion(L_uH, Imax_A, DCRmax, rho, J, box);
     return;
   }
@@ -529,7 +539,7 @@ function renderNewCoreSuggestion(L_uH, Imax_A, DCRmax_val, rho, J, box) {
     return;
   }
 
-  const tableRows = rows.map(r => `
+  const tableRows = rows.map((r, i) => `
     <tr>
       <td style="color:var(--accent);font-weight:600">${r.N}</td>
       <td style="color:var(--text);font-family:var(--mono)">${r.OD_mils} <span style="color:var(--text3);font-size:10px">(${r.OD_mm}mm)</span></td>
@@ -539,9 +549,10 @@ function renderNewCoreSuggestion(L_uH, Imax_A, DCRmax_val, rho, J, box) {
       <td style="color:var(--text2)">AWG ${r.AWG} ${r.wireType}</td>
       <td>
         <span style="color:var(--accent2);font-weight:600;font-size:11px">${r.mat.tipo}</span><br>
-        <span style="color:var(--text2);font-size:10px;font-family:var(--mono)">${r.mat.mix}</span><br>
-        <span style="color:var(--text3);font-size:10px">${r.mat.nota}</span>
+        <span style="color:var(--text2);font-size:10px;font-family:var(--mono)">${r.mat.mix}</span>
       </td>
+      <td><a href="#" class="nc-load" data-idx="${i}"
+          style="color:var(--accent2);font-size:11px">→ cargar</a></td>
     </tr>`).join('');
 
   box.innerHTML = `
@@ -554,7 +565,7 @@ function renderNewCoreSuggestion(L_uH, Imax_A, DCRmax_val, rho, J, box) {
       <thead><tr>
         <th>N vueltas</th><th>OD requerido</th><th>AL (nH/N²)</th>
         <th>Lef (mils)</th><th>Largo / Corte (mils)</th><th>Alambre</th>
-        <th>Material sugerido</th>
+        <th>Material sugerido</th><th></th>
       </tr></thead>
       <tbody>${tableRows}</tbody>
     </table>
@@ -562,6 +573,30 @@ function renderNewCoreSuggestion(L_uH, Imax_A, DCRmax_val, rho, J, box) {
       ★ OD y largo son mínimos para single-layer · AL es el valor que debe medir el núcleo con LCR ·
       Material basado en AL requerido e Imax — verificar con hoja de datos del fabricante
     </div>`;
+
+  // Eventos "→ cargar" — llena el panel de detalle con los parámetros del núcleo sugerido
+  box.querySelectorAll('.nc-load').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const r = rows[parseInt(a.dataset.idx)];
+      if (!r) return;
+      document.getElementById('ALval').value       = r.AL_nH;
+      document.getElementById('bobbinOD').value    = r.OD_mils;
+      document.getElementById('bobbinLen').value   = r.lenMils;
+      document.getElementById('bobbinCorte').value = r.corteMils;
+      document.getElementById('bobbinID').value    = 0;
+      document.getElementById('dimUnit').value     = 'mils';
+      document.getElementById('AWG').value         = r.AWG;
+      document.getElementById('wireType').value    = r.wireType;
+      document.getElementById('windingStyle').value = 'close';
+      document.getElementById('allowHalfTurns').value = 'half';
+      onDimUnitChange();
+      onWireTypeChange();
+      onWindingStyleChange();
+      calc();
+      document.getElementById('manualSection').scrollIntoView({ behavior: 'smooth' });
+    });
+  });
 }
 
 // ── GENERAR SELECT DE AWG ──
