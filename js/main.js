@@ -234,6 +234,84 @@ function showAWGSuggestion(suggested, current, Imax) {
   }
 }
 
+// ── ANÁLISIS DE FRECUENCIA (efecto piel) ──
+// δ(µm) = 66.1/√f(MHz) para cobre a 20°C.
+// AWG óptimo: el más grueso cuyo Ø ≤ 2δ (todo el conductor conduce, sin desperdicio de cobre).
+// R_ac/R_dc ≈ d/(4δ) cuando d >> δ; ≈ 1 cuando d ≤ 2δ.
+function skinDepth_um(freqMHz) {
+  return freqMHz > 0 ? 66.1 / Math.sqrt(freqMHz) : Infinity;
+}
+
+// Devuelve el AWG más grueso (menor número) cuyo Ø ≤ 2δ
+function optimalAWGforFreq(freqMHz) {
+  if (freqMHz <= 0) return null;
+  const dLimit_um = 2 * skinDepth_um(freqMHz);
+  for (let awg = 10; awg <= 49; awg++) {
+    if (AWG_DATA[awg] && AWG_DATA[awg].d * 1000 <= dLimit_um) return awg;
+  }
+  return 49; // ni el más fino baja del límite → usar el más fino disponible
+}
+
+// Estima R_ac/R_dc para un AWG dado a frecuencia f
+function acDcRatio(awg, freqMHz) {
+  if (freqMHz <= 0 || !AWG_DATA[awg]) return 1;
+  const d_um = AWG_DATA[awg].d * 1000;
+  const delta = skinDepth_um(freqMHz);
+  const x = d_um / delta;
+  if (x <= 2) return 1 + Math.pow(x, 4) / 192; // efecto piel despreciable
+  return x / 4 + 0.26;                           // asintótico para alambre grueso
+}
+
+// Polvos T-xB cuyo rango de frecuencia cubre f (parsea "20-100 MHz")
+function powdersForFreq(freqMHz) {
+  if (freqMHz <= 0) return [];
+  return POWDER_DATA.filter(p => {
+    const m = p.freq.match(/([\d.]+)\s*-\s*([\d.]+)/);
+    if (!m) return false;
+    return freqMHz >= parseFloat(m[1]) && freqMHz <= parseFloat(m[2]);
+  });
+}
+
+function renderFreqAnalysis(freqMHz, currentAWG) {
+  const box = document.getElementById('freqBox');
+  if (!box) return;
+  if (freqMHz <= 0) { box.innerHTML = ''; return; }
+
+  const delta   = skinDepth_um(freqMHz);
+  const optAWG  = optimalAWGforFreq(freqMHz);
+  const ratio   = acDcRatio(currentAWG, freqMHz);
+  const optD    = AWG_DATA[optAWG] ? (AWG_DATA[optAWG].d).toFixed(4) : '—';
+  const curD    = AWG_DATA[currentAWG] ? AWG_DATA[currentAWG].d * 1000 : 0;
+
+  // Color del ratio: verde <1.1, amarillo <1.5, rojo ≥1.5
+  let ratioColor = 'var(--accent)';
+  if (ratio >= 1.5)      ratioColor = 'var(--danger)';
+  else if (ratio >= 1.1) ratioColor = 'var(--warn)';
+
+  const powders = powdersForFreq(freqMHz);
+  const matTxt = powders.length
+    ? powders.map(p => `<strong style="color:var(--accent2)">${p.grade}</strong> (µ≈${p.mu})`).join(' · ')
+    : '<span style="color:var(--warn)">ningún T-xB cubre esta frecuencia — verificar ficha o usar ferrita</span>';
+
+  let acWarn = '';
+  if (ratio >= 1.5) {
+    acWarn = `<div class="alert alert-warn" style="margin-top:8px">⚠ A ${freqMHz} MHz el AWG ${currentAWG} (Ø${curD.toFixed(0)}µm) sufre fuerte efecto piel: ` +
+      `R_ac ≈ <strong>${ratio.toFixed(2)}× R_dc</strong>. El DCR calculado (DC) subestima la pérdida real. ` +
+      `Usar AWG ${optAWG} o más fino, o hilo Litz.</div>`;
+  } else if (ratio >= 1.1) {
+    acWarn = `<div class="alert alert-ok" style="border-color:var(--warn);color:var(--text2);margin-top:8px">ℹ R_ac ≈ ${ratio.toFixed(2)}× R_dc a ${freqMHz} MHz — efecto piel moderado.</div>`;
+  }
+
+  box.innerHTML = `
+    <div class="mat-info-grid" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px">
+      <div class="mat-info-item">Profundidad de piel δ: <span style="color:var(--accent)">${delta.toFixed(2)} µm</span></div>
+      <div class="mat-info-item">Ø útil máx (2δ): <span style="color:var(--accent)">${(2 * delta).toFixed(2)} µm</span></div>
+      <div class="mat-info-item">AWG óptimo @ ${freqMHz} MHz: <span style="color:var(--accent2)">AWG ${optAWG}</span> <span style="color:var(--text3);font-size:10px">(Ø${optD}mm)</span></div>
+      <div class="mat-info-item">R_ac/R_dc (AWG ${currentAWG}): <span style="color:${ratioColor}">${ratio.toFixed(2)}×</span></div>
+      <div class="mat-info-item" style="grid-column:1/-1;color:var(--text3)">Polvo T-xB apto para ${freqMHz} MHz: ${matTxt}</div>
+    </div>${acWarn}`;
+}
+
 // ── SELECTOR DE SERIE ──
 function initSeriesButtons() {
   document.getElementById('seriesGroup').addEventListener('click', e => {
@@ -637,6 +715,7 @@ function calc() {
   const J      = parseFloat(document.getElementById('Jdens').value)         || 400;
   const awg    = parseInt(document.getElementById('AWG').value)             || 36;
   const unit   = document.getElementById('dimUnit').value;
+  const freq   = parseFloat(document.getElementById('freqMHz').value)       || 0;
 
   const lenRaw   = parseFloat(document.getElementById('bobbinLen').value)   || 0;
   const corteRaw = parseFloat(document.getElementById('bobbinCorte').value) || 0;
@@ -689,6 +768,9 @@ function calc() {
   const awgSugg = suggestAWG(Imax, J);
   showAWGSuggestion(awgSugg, awg, Imax);
   updateWireDiamInfo();
+
+  // ── Análisis de frecuencia (efecto piel) ──
+  renderFreqAnalysis(freq, awg);
 
   // ── Métricas ──
   document.getElementById('rN').textContent         = N;

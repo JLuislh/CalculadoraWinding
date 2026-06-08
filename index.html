@@ -55,6 +55,13 @@
       </div>
       <div class="sep"></div>
       <div class="field">
+        <label>Frecuencia de uso / testeo (opcional)</label>
+        <input type="number" id="freqMHz" value="0" step="0.1" min="0" oninput="calc()">
+        <div class="hint">MHz — 0 = solo DC. Activa análisis de efecto piel y AWG óptimo por frecuencia</div>
+      </div>
+      <div id="freqBox" style="margin-top:8px"></div>
+      <div class="sep"></div>
+      <div class="field">
         <label>Serie / Paquete</label>
         <div class="series-group" id="seriesGroup">
           <button class="series-btn active" data-series="">Todas</button>
