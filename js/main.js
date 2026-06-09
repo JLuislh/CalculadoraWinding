@@ -58,14 +58,16 @@ const BOBINA_DATA = {
 // ── POLVOS DISPONIBLES (Yuean Unifine, factura YA2020-12-15E) ──
 // µr estimado según equivalencia Micrometals. DC bias = excelente en todos (polvo hierro).
 // T-6B = Mix-6 (bobinas -6 actuales) · T-2B = Mix-2 (bobinas -2 actuales)
+// Max Frequency (MHz) de tabla oficial Micrometals/Amidon (hierro carbonilo).
+// El polvo de hierro funciona desde DC; el rango es "0-{Max Freq}".
 const POWDER_DATA = [
-  { grade:'T-17B', mu: 4,   freq:'200-1000 MHz', AL_rel:'muy bajo', nota:'Muy alta frecuencia · bajo AL por tamaño' },
-  { grade:'T-10B', mu: 6,   freq:'100-500 MHz',  AL_rel:'bajo',     nota:'Alta frecuencia · precio mayor' },
-  { grade:'T-6B',  mu: 8.5, freq:'50-200 MHz',   AL_rel:'bajo',     nota:'★ ACTUAL bobinas -6 · referencia base' },
-  { grade:'T-7B',  mu: 9,   freq:'50-200 MHz',   AL_rel:'bajo',     nota:'Similar a T-6B, ligeramente mayor AL' },
-  { grade:'T-4B',  mu: 9,   freq:'30-100 MHz',   AL_rel:'bajo',     nota:'Similar a T-2B/-6B' },
-  { grade:'T-2B',  mu: 10,  freq:'20-100 MHz',   AL_rel:'bajo+',    nota:'★ ACTUAL bobinas -2 · mayor AL que T-6B' },
-  { grade:'T-8B',  mu: 35,  freq:'1-50 MHz',     AL_rel:'medio',    nota:'Mayor µ · más AL por tamaño · verificar ficha' },
+  { grade:'T-17B', mu: 4,   freq:'0-170 MHz', AL_rel:'muy bajo', nota:'Mat. -17 · Max Freq 170 MHz · bajo AL por tamaño' },
+  { grade:'T-10B', mu: 6,   freq:'0-83 MHz',  AL_rel:'bajo',     nota:'Mat. -10 · Max Freq 83 MHz · precio mayor' },
+  { grade:'T-6B',  mu: 8.5, freq:'0-55 MHz',  AL_rel:'bajo',     nota:'★ ACTUAL bobinas -6 · Mat. -6 · Max Freq 55 MHz' },
+  { grade:'T-7B',  mu: 9,   freq:'0-50 MHz',  AL_rel:'bajo',     nota:'Mat. -7 · Max Freq 50 MHz · ligeramente mayor AL que -6' },
+  { grade:'T-4B',  mu: 9,   freq:'0-50 MHz',  AL_rel:'bajo',     nota:'Sin -4 en tabla oficial · asumido como -7 (µ igual) · verificar' },
+  { grade:'T-2B',  mu: 10,  freq:'0-45 MHz',  AL_rel:'bajo+',    nota:'★ ACTUAL bobinas -2 · Mat. -2 · Max Freq 45 MHz' },
+  { grade:'T-8B',  mu: 35,  freq:'0-5 MHz',   AL_rel:'medio',    nota:'Mat. -8 · Max Freq 5 MHz (¡bajo!) · mayor µ y AL' },
 ];
 
 // Serie/paquete seleccionada ('' = todas)
