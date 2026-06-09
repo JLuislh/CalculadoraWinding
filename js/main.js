@@ -282,59 +282,44 @@ function powdersForFreq(freqMHz) {
   });
 }
 
+// Solo muestra el panel cuando la frecuencia OBLIGA a cambiar algo de fabricación:
+//  · alambre  → efecto piel real (R_ac/R_dc ≥ 1.1 → conviene AWG más fino o Litz)
+//  · material → frecuencia por encima del rango de los polvos (→ núcleo no magnético)
+// Si no hay impacto real (caso típico baja frecuencia), el panel queda oculto.
 function renderFreqAnalysis(freqMHz, currentAWG) {
   const box = document.getElementById('freqBox');
   if (!box) return;
   if (freqMHz <= 0) { box.innerHTML = ''; return; }
 
-  const delta   = skinDepth_um(freqMHz);
-  const optAWG  = optimalAWGforFreq(freqMHz);
-  const ratio   = acDcRatio(currentAWG, freqMHz);
-  const optD    = AWG_DATA[optAWG] ? (AWG_DATA[optAWG].d).toFixed(4) : '—';
-  const curD    = AWG_DATA[currentAWG] ? AWG_DATA[currentAWG].d * 1000 : 0;
+  const ratio  = acDcRatio(currentAWG, freqMHz);
+  const bounds = POWDER_DATA.map(p => p.freq.match(/([\d.]+)\s*-\s*([\d.]+)/)).filter(Boolean);
+  const fMax   = Math.max(...bounds.map(m => parseFloat(m[2]))); // techo del rango de polvos
 
-  // Color del ratio: verde <1.1, amarillo <1.5, rojo ≥1.5
-  let ratioColor = 'var(--accent)';
-  if (ratio >= 1.5)      ratioColor = 'var(--danger)';
-  else if (ratio >= 1.1) ratioColor = 'var(--warn)';
+  const wireImpact = ratio >= 1.1;     // efecto piel cambia la elección de alambre
+  const matImpact  = freqMHz > fMax;   // frecuencia obliga a núcleo no magnético
 
-  const powders = powdersForFreq(freqMHz);
-  let matTxt;
-  if (powders.length) {
-    matTxt = powders.map(p => `<strong style="color:var(--accent2)">${p.grade}</strong> (µ≈${p.mu})`).join(' · ');
-  } else {
-    // Rango total cubierto por los polvos T-xB (parsea cada "X-Y MHz")
-    const bounds = POWDER_DATA.map(p => p.freq.match(/([\d.]+)\s*-\s*([\d.]+)/)).filter(Boolean);
-    const fMax = Math.max(...bounds.map(m => parseFloat(m[2]))); // techo (T-17B: 1000 MHz)
-    const fMin = Math.min(...bounds.map(m => parseFloat(m[1]))); // piso  (T-8B: 1 MHz)
-    if (freqMHz > fMax) {
-      // Demasiado alta para cualquier polvo magnético → núcleo no magnético
-      matTxt = `<span style="color:var(--warn)">${freqMHz} MHz supera el rango de los polvos T-xB (≤${fMax} MHz) — usar <strong style="color:var(--accent2)">núcleo no magnético: plástico, fenólico, cerámico o aire</strong> (µ≈1, sin aporte magnético). El AL viene solo de la geometría del bobinado.</span>`;
-    } else {
-      // Por debajo del piso de los polvos → a baja frecuencia el efecto piel y la
-      // pérdida del núcleo son despreciables: el material lo decide el DC bias, no la
-      // frecuencia. Para alta corriente → polvo de hierro (saturación suave).
-      matTxt = `<span style="color:var(--warn)">A ${freqMHz} MHz (baja frecuencia) el efecto piel es despreciable — el material lo decide el <strong style="color:var(--accent2)">DC bias, no la frecuencia</strong>. Para alta corriente usar <strong style="color:var(--accent2)">polvo de hierro</strong> (saturación suave, p.ej. T-xB); más µ = menos vueltas = menor DCR, pero verificar que no sature a I máx.</span>`;
-    }
+  // Sin impacto en fabricación → no mostrar nada (evita confusión)
+  if (!wireImpact && !matImpact) { box.innerHTML = ''; return; }
+
+  let blocks = '';
+
+  if (wireImpact) {
+    const delta = skinDepth_um(freqMHz);
+    const optAWG = optimalAWGforFreq(freqMHz);
+    const curD   = AWG_DATA[currentAWG] ? AWG_DATA[currentAWG].d * 1000 : 0;
+    const strong = ratio >= 1.5;
+    blocks += `<div class="alert alert-warn" style="margin-top:8px">⚠ <strong>Cambia el alambre:</strong> a ${freqMHz} MHz el AWG ${currentAWG} (Ø${curD.toFixed(0)}µm) ` +
+      `tiene R_ac ≈ <strong>${ratio.toFixed(2)}× R_dc</strong> por efecto piel (δ=${delta.toFixed(1)}µm). ` +
+      `El DCR calculado es DC y subestima la pérdida real. ` +
+      `Usar <strong>AWG ${optAWG} o más fino</strong>${strong ? ', o hilo Litz' : ''}.</div>`;
   }
 
-  let acWarn = '';
-  if (ratio >= 1.5) {
-    acWarn = `<div class="alert alert-warn" style="margin-top:8px">⚠ A ${freqMHz} MHz el AWG ${currentAWG} (Ø${curD.toFixed(0)}µm) sufre fuerte efecto piel: ` +
-      `R_ac ≈ <strong>${ratio.toFixed(2)}× R_dc</strong>. El DCR calculado (DC) subestima la pérdida real. ` +
-      `Usar AWG ${optAWG} o más fino, o hilo Litz.</div>`;
-  } else if (ratio >= 1.1) {
-    acWarn = `<div class="alert alert-ok" style="border-color:var(--warn);color:var(--text2);margin-top:8px">ℹ R_ac ≈ ${ratio.toFixed(2)}× R_dc a ${freqMHz} MHz — efecto piel moderado.</div>`;
+  if (matImpact) {
+    blocks += `<div class="alert alert-warn" style="margin-top:8px">⚠ <strong>Cambia el material:</strong> ${freqMHz} MHz supera el rango de los polvos T-xB (≤${fMax} MHz) — ` +
+      `usar <strong>núcleo no magnético: plástico, fenólico, cerámico o aire</strong> (µ≈1). El AL viene solo de la geometría del bobinado.</div>`;
   }
 
-  box.innerHTML = `
-    <div class="mat-info-grid" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px">
-      <div class="mat-info-item">Profundidad de piel δ: <span style="color:var(--accent)">${delta.toFixed(2)} µm</span></div>
-      <div class="mat-info-item">Ø útil máx (2δ): <span style="color:var(--accent)">${(2 * delta).toFixed(2)} µm</span></div>
-      <div class="mat-info-item">AWG óptimo @ ${freqMHz} MHz: <span style="color:var(--accent2)">AWG ${optAWG}</span> <span style="color:var(--text3);font-size:10px">(Ø${optD}mm)</span></div>
-      <div class="mat-info-item">R_ac/R_dc (AWG ${currentAWG}): <span style="color:${ratioColor}">${ratio.toFixed(2)}×</span></div>
-      <div class="mat-info-item" style="grid-column:1/-1;color:var(--text3)">Polvo T-xB apto para ${freqMHz} MHz: ${matTxt}</div>
-    </div>${acWarn}`;
+  box.innerHTML = blocks;
 }
 
 // ── SELECTOR DE SERIE ──
