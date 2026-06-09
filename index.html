@@ -56,8 +56,15 @@
       <div class="sep"></div>
       <div class="field">
         <label>Frecuencia de uso / testeo (opcional)</label>
-        <input type="number" id="freqMHz" value="0" step="0.1" min="0" oninput="calc()">
-        <div class="hint">MHz — 0 = solo DC. Activa análisis de efecto piel y AWG óptimo por frecuencia</div>
+        <div style="display:flex;gap:6px;align-items:stretch">
+          <input type="number" id="freqMHz" value="0" step="1" min="0" oninput="calc()" style="flex:1 1 auto;min-width:0">
+          <select id="freqUnit" onchange="calc()"
+            style="flex:0 0 64px;width:64px;font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--border2);color:var(--text2);border-radius:3px;padding:3px 6px;cursor:pointer">
+            <option value="MHz" selected>MHz</option>
+            <option value="kHz">kHz</option>
+          </select>
+        </div>
+        <div class="hint">0 = solo DC. Activa análisis de efecto piel y AWG óptimo por frecuencia</div>
       </div>
       <div id="freqBox" style="margin-top:8px"></div>
       <div class="sep"></div>
@@ -232,12 +239,6 @@
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-header"><span class="panel-title">Verificación de capas</span></div>
-        <div class="panel-body">
-          <div class="info-box" id="layerInfo">—</div>
-        </div>
-      </div>
     </div>
 
   </div><!-- /main-grid -->

@@ -9,29 +9,39 @@
 // ext_mat: true = material externo (bobina ya formada, no polvo T-xB)
 const BOBINA_DATA = {
   'B-5002-6': {
-    series: 'CHIP-5000', OD_mils: 67,  AL_nH: 2.71,
-    len_mils: 87, corte_mils: 40.5, od_ok: false,
-    nota: 'Serie 5000 · OD estimado (medir)'
+    series: 'CHIP-5000', OD_mils: 62,  AL_nH: 2.71,
+    len_mils: 87, corte_mils: 40.5, od_ok: true,
+    nota: 'Serie 5000 · material magnético · OD medido 0.062" (fenólico sería 0.055")'
+  },
+  'B-5002-0': {
+    series: 'CHIP-5000', OD_mils: 55, AL_nH: 1.06,
+    len_mils: 87, corte_mils: 40.5, od_ok: true,
+    nota: 'Serie 5000 var.0 · núcleo FENÓLICO (no magnético, µ≈1) · OD medido 0.055" · AL estimado núcleo de aire (Wheeler, una capa)'
   },
   'B-6500-6': {
-    series: 'CHIP-6500', OD_mils: 110, AL_nH: 1.32,
-    len_mils: 66, corte_mils: 23.5, od_ok: false,
-    nota: 'Serie 6500 var.6 · AL de 2 muestras CL · OD estimado (medir)'
+    series: 'CHIP-6500', OD_mils: 35, AL_nH: 1.32,
+    len_mils: 66, corte_mils: 23.5, od_ok: true,
+    nota: 'Serie 6500 var.6 · AL de 2 muestras CL · OD medido 0.035"'
   },
   'B-8000-6': {
-    series: 'CHIP-8000', OD_mils: 157, AL_nH: 2.37,
+    series: 'CHIP-8000', OD_mils: 55, AL_nH: 2.37,
     len_mils: 87, corte_mils: 32.5, od_ok: true,
-    nota: 'Serie 8000 · OD confirmado por close-layer'
+    nota: 'Serie 8000 · OD medido 0.055"'
   },
   'B-1003-6': {
-    series: 'CHIP-10000', OD_mils: 165, AL_nH: 4.85,
+    series: 'CHIP-10000', OD_mils: 94, AL_nH: 4.85,
     len_mils: 97.5, corte_mils: 50, od_ok: true,
-    nota: 'Serie 10000 var.6 · OD confirmado por close-layer'
+    nota: 'Serie 10000 var.6 · OD medido 0.094"'
   },
   'B-1003-2': {
     series: 'CHIP-10000', OD_mils: 128, AL_nH: 4.00,
     len_mils: 97, corte_mils: 50.5, od_ok: false,
     nota: 'Serie 10000 var.2 · OD estimado de multi-layer (medir)'
+  },
+  'B-1003-0': {
+    series: 'CHIP-10000', OD_mils: 90, AL_nH: 2.33,
+    len_mils: 97, corte_mils: 50.5, od_ok: true,
+    nota: 'Serie 10000 var.0 · núcleo FENÓLICO (no magnético, µ≈1) · OD medido 0.090" · AL estimado núcleo de aire (Wheeler, una capa)'
   },
   'B-11000-M9': {
     series: 'CHIP-11000', OD_mils: 93, AL_nH: 17.73,
@@ -289,9 +299,24 @@ function renderFreqAnalysis(freqMHz, currentAWG) {
   else if (ratio >= 1.1) ratioColor = 'var(--warn)';
 
   const powders = powdersForFreq(freqMHz);
-  const matTxt = powders.length
-    ? powders.map(p => `<strong style="color:var(--accent2)">${p.grade}</strong> (µ≈${p.mu})`).join(' · ')
-    : '<span style="color:var(--warn)">ningún T-xB cubre esta frecuencia — verificar ficha o usar ferrita</span>';
+  let matTxt;
+  if (powders.length) {
+    matTxt = powders.map(p => `<strong style="color:var(--accent2)">${p.grade}</strong> (µ≈${p.mu})`).join(' · ');
+  } else {
+    // Rango total cubierto por los polvos T-xB (parsea cada "X-Y MHz")
+    const bounds = POWDER_DATA.map(p => p.freq.match(/([\d.]+)\s*-\s*([\d.]+)/)).filter(Boolean);
+    const fMax = Math.max(...bounds.map(m => parseFloat(m[2]))); // techo (T-17B: 1000 MHz)
+    const fMin = Math.min(...bounds.map(m => parseFloat(m[1]))); // piso  (T-8B: 1 MHz)
+    if (freqMHz > fMax) {
+      // Demasiado alta para cualquier polvo magnético → núcleo no magnético
+      matTxt = `<span style="color:var(--warn)">${freqMHz} MHz supera el rango de los polvos T-xB (≤${fMax} MHz) — usar <strong style="color:var(--accent2)">núcleo no magnético: plástico, fenólico, cerámico o aire</strong> (µ≈1, sin aporte magnético). El AL viene solo de la geometría del bobinado.</span>`;
+    } else {
+      // Por debajo del piso de los polvos → a baja frecuencia el efecto piel y la
+      // pérdida del núcleo son despreciables: el material lo decide el DC bias, no la
+      // frecuencia. Para alta corriente → polvo de hierro (saturación suave).
+      matTxt = `<span style="color:var(--warn)">A ${freqMHz} MHz (baja frecuencia) el efecto piel es despreciable — el material lo decide el <strong style="color:var(--accent2)">DC bias, no la frecuencia</strong>. Para alta corriente usar <strong style="color:var(--accent2)">polvo de hierro</strong> (saturación suave, p.ej. T-xB); más µ = menos vueltas = menor DCR, pero verificar que no sature a I máx.</span>`;
+    }
+  }
 
   let acWarn = '';
   if (ratio >= 1.5) {
@@ -715,7 +740,9 @@ function calc() {
   const J      = parseFloat(document.getElementById('Jdens').value)         || 400;
   const awg    = parseInt(document.getElementById('AWG').value)             || 36;
   const unit   = document.getElementById('dimUnit').value;
-  const freq   = parseFloat(document.getElementById('freqMHz').value)       || 0;
+  const freqIn   = parseFloat(document.getElementById('freqMHz').value)     || 0;
+  const freqUnit = document.getElementById('freqUnit').value;
+  const freq     = freqUnit === 'kHz' ? freqIn / 1000 : freqIn;            // siempre en MHz internamente
 
   const lenRaw   = parseFloat(document.getElementById('bobbinLen').value)   || 0;
   const corteRaw = parseFloat(document.getElementById('bobbinCorte').value) || 0;
@@ -791,15 +818,6 @@ function calc() {
     `OD: <span style="color:var(--text)">${OD_mm.toFixed(2)}mm</span> &nbsp;·&nbsp; ` +
     `ID: <span style="color:var(--text)">${ID_mm.toFixed(2)}mm</span> &nbsp;·&nbsp; ` +
     `MLT${nLayers > 1 ? ` (${nLayers} capas)` : ''} = <span style="color:var(--accent)">${MLT_mm.toFixed(2)}mm</span>`;
-
-  // ── Info de capas ──
-  const layerTxt = Nper_layer > 0
-    ? `Largo efectivo ${lefMM.toFixed(2)}mm ÷ Ø alambre ${dCoat.toFixed(3)}mm = ` +
-      `<span style="color:var(--accent)">${Nper_layer} vueltas/capa</span> &nbsp;·&nbsp; ` +
-      `${N} vueltas totales → <span style="color:var(--accent)">${layers} capa(s)</span>` +
-      (nLayers > 1 ? ` &nbsp;·&nbsp; <span style="color:var(--warn)">MLT corregido (${nLayers} capas)</span>` : '')
-    : 'Ingresa las dimensiones de la bobina para calcular capas.';
-  document.getElementById('layerInfo').innerHTML = layerTxt;
 
   // ── Barra de fórmula ──
   const modeLabel = document.getElementById('allowHalfTurns').value;
