@@ -34,9 +34,9 @@ const BOBINA_DATA = {
     nota: 'Serie 10000 var.6 · OD medido 0.094"'
   },
   'B-1003-2': {
-    series: 'CHIP-10000', OD_mils: 128, AL_nH: 4.00,
-    len_mils: 97, corte_mils: 50.5, od_ok: false,
-    nota: 'Serie 10000 var.2 · OD estimado de multi-layer (medir)'
+    series: 'CHIP-10000', OD_mils: 94, AL_nH: 4.00,
+    len_mils: 97, corte_mils: 50.5, od_ok: true,
+    nota: 'Serie 10000 var.2 · mismo núcleo magnético que B-1003-6 (0.094") · solo cambia material/AL'
   },
   'B-1003-0': {
     series: 'CHIP-10000', OD_mils: 90, AL_nH: 2.33,
