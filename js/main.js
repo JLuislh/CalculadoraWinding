@@ -53,6 +53,16 @@ const BOBINA_DATA = {
     len_mils: 101, corte_mils: 49, od_ok: false, ext_mat: true,
     nota: 'Serie 11000-C5 · TIYA/770G · OD calculado de 11118 (4700µH, AWG47, 352.5v)'
   },
+  'B-0156-8': {
+    series: 'CHIP-0156', OD_mils: 156, AL_nH: 19,
+    len_mils: 400, corte_mils: 0, od_ok: true,
+    nota: 'Barra Ø0.156" × 0.400" · material -8 (µ35) · AL interpolado de mediciones reales (verificar prototipo)'
+  },
+  'B-0156-2': {
+    series: 'CHIP-0156', OD_mils: 156, AL_nH: 10,
+    len_mils: 400, corte_mils: 0, od_ok: true,
+    nota: 'Barra Ø0.156" × 0.400" · material -2 (µ10) · AL de mediciones reales (10v→1.07µH)'
+  },
 };
 
 // ── POLVOS DISPONIBLES (Yuean Unifine, factura YA2020-12-15E) ──
@@ -396,7 +406,7 @@ function autoSelect(L_uH, Imax_A, DCRmax_val, rho, J, seriesFilter) {
       const wtype = WIRE_TYPES[wt];
       const candidates = [];
 
-      for (let awg = 49; awg >= 24; awg--) {
+      for (let awg = 49; awg >= 18; awg--) {
         const wire = AWG_DATA[awg];
         if (!wire) continue;
 
